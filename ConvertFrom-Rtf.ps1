@@ -23,8 +23,6 @@ begin {
 
     $NameOfFunction = 'ConvertFrom-Rtf'
 
-    
-
     $CountFiles = ($PathToFile | Measure-Object).Count
 
     $ErrorActionPreference = 'Stop'
