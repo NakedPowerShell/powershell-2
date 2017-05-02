@@ -139,7 +139,7 @@ $ComputerName | ForEach-Object {
 
       Remove-CimSession -CimSession $CimSession
 
-      $monitorInfo = @()
+      $MonitorInfo = @()
 
       ForEach ($Monitor in $CimMonitors) {
 
@@ -175,12 +175,31 @@ $ComputerName | ForEach-Object {
           }
         )
 
+        $Monitor3 = New-Object -TypeName psobject -Property (
+          @{ 'Name' = $null ;
+             'SerialNumber' = $null
+          }
+        )
+
       }
 
       if ($MonitorCount -eq 2) {
 
         $Monitor1 = $MonitorInfo[0]
         $Monitor2 = $MonitorInfo[1]
+        $Monitor3 = New-Object -TypeName psobject -Property (
+          @{ 'Name' = $null ;
+             'SerialNumber' = $null
+          }
+        )
+
+      }
+
+      if ($MonitorCount -eq 3) {
+
+        $Monitor1 = $MonitorInfo[0]
+        $Monitor2 = $MonitorInfo[1]
+        $Monitor3 = $MonitorInfo[2]
 
       }
 
@@ -200,7 +219,9 @@ $ComputerName | ForEach-Object {
            'Monitor1Name' = $Monitor1.Name ;
            'Monitor1SerialNumber' = $Monitor1.SerialNumber ;
            'Monitor2Name' = $Monitor2.Name ;
-           'Monitor2SerialNumber' = $Monitor2.SerialNumber
+           'Monitor2SerialNumber' = $Monitor2.SerialNumber;
+           'Monitor3Name' = $Monitor3.Name ;
+           'Monitor3SerialNumber' = $Monitor3.SerialNumber
         }
       )
 
@@ -221,7 +242,9 @@ $ComputerName | ForEach-Object {
                               Monitor1Name,
                               Monitor1SerialNumber,
                               Monitor2Name,
-                              Monitor2SerialNumber
+                              Monitor2SerialNumber,
+                              Monitor3Name,
+                              Monitor3SerialNumber
 
     } # End of if (and caring)
 
