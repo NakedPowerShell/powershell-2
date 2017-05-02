@@ -6,7 +6,7 @@ Param (
 
   [parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
   [Alias('DNSHostName','PSComputerName','CN','Hostname')]
-  [array] $ComputerName = @($env:COMPUTERNAME),
+  [string[]] $ComputerName = @($env:COMPUTERNAME),
 
   [int] $Hours = 1,
 
