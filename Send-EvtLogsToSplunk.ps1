@@ -9,13 +9,25 @@ Param (
 
 	[string] $DataProperty = $env:USERNAME,
 
-	[string] $SplunkHecUri = 'http://splunk.example.com:8088/services/collector',
+	[string] $SplunkServer = 'splunk.example.com',
 
-	[string] $SplunkHecApiKey = 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
+	[string] $Port = '8088',
 
-	[switch] $TeeOutput,
+	[string] $ApiKey = 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
 
-	[System.Collections.Hashtable] $SplunkHecRestHeaders = @{ Authorization = "Splunk $SplunkHecApiKey" },
+	[parameter()]
+	[ValidateSet('http', 'https')]
+	[string] $Protocol = 'http',
+
+	[string] $EndPoint = '/services/collector',
+
+	[string] $SplunkHecUrl = "$($Protocol + '://' + $SplunkServer + ':' + $Port + $EndPoint)",
+
+	[switch] $PassThru,
+
+	[string] $Provider = 'Microsoft-Windows-Security-Auditing',
+
+	[System.Collections.Hashtable] $Headers = @{ Authorization = "Splunk $ApiKey" },
 
 	[datetime] $Epoch = (Get-Date -Date '01/01/1970')
 
@@ -35,7 +47,7 @@ Process {
 <QueryList>
   <Query Id='0' Path='file://$($_.FullName)'>
     <Select Path='file://$($_.FullName)'>
-      *[System[Provider[@Name='Microsoft-Windows-Security-Auditing'] and
+      *[System[Provider[@Name='$Provider'] and
         (
           EventID=4720 or
           EventID=4722 or
@@ -60,6 +72,7 @@ Process {
 
 	$ErrorActionPreferenceBak = $ErrorActionPreference
 
+	# Set ErrorActionPreference to Stop for the trycatch
 	$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 
 	try {
@@ -74,6 +87,7 @@ Process {
 
 	$ErrorActionPreference = $ErrorActionPreferenceBak
 
+	# If any events are returned, continiue.
 	if (!($Events -eq $false)) {
 
 		ForEach ($Event in $Events) {
@@ -86,7 +100,8 @@ Process {
 			# Check to see if there's anything in the Event.EventData.Data nodes
 			if ($XmlData = @($EventXml.Event.EventData.Data)) {
 
-				# Iterate through the EventData fields.
+				# Loop through the EventData fields.
+				# Use an integrated loop counter based on the total count of Data fields.
 				for ($i=0; $i -lt $XmlData.Count; $i++) {
 
 					# Append each one as a NoteProperty to the parent event.
@@ -103,7 +118,7 @@ Process {
 
 			} #if
 
-		} #ForEach
+		} #ForEach (`$Event in `$Events)
 
 		$Events | ForEach-Object {
 
@@ -125,29 +140,30 @@ Process {
 										).ToString()
 									)
 
-			# Build the HTTP body being sure to follow JSON formatting.
+			# Build the HTTP body. Be sure to follow proper JSON formatting.
 			# You could also add a sourcetype to the top level of the JSON object.
+			# See: 'http://dev.splunk.com/view/event-collector/SP-CAAAE6P#meta' for details.
 			$Body = "{`"time`": `"$EpochTime`",`"host`": `"$($_.MachineName)`",`"event`": $JsonEvent}"
 
-			$SplatArgs = @{	Uri = $SplunkHecUri ;
-							Headers = $SplunkHecRestHeaders ;
+			$SplatArgs = @{	Uri = $SplunkHecUrl ;
+							Headers = $Headers ;
 							Method = 'Post' ;
 							Body = $Body }
 
 			# Send the event to Splunk HTTP event collector.
 			Invoke-RestMethod @SplatArgs | Out-Null
 
-			if ($TeeOutput) {
+			if ($PassThru) {
 
 				$EachEvent
 
 			}
 
-		} #ForEach-Object
+		} #ForEach-Object (`$Events)
 
 	} #if
 
-	} #ForEach-Object
+	} #ForEach-Object (`$LogFiles)
 
 } #Process
 
@@ -156,36 +172,41 @@ End {} #End
 <#
 .SYNOPSIS
 	Parses saved evt log files and exports them to Splunk.
-
 .DESCRIPTION
 	Parses saved evt log files using advanced XML query filters.
 	Extracts embedded EventData and appends it to the parent event.
 	Exports the events to Splunk via the HTTP event collector API.
-
+.EXAMPLE
+	. C:\Scripts\Send-EvtLogsToSplunk.ps1 -LogFilePath '\\server2\path2' -DataProperty 'john.doe'
+.INPUTS
+	System.String
+.OUTPUTS
+	None
+	System.Diagnostics.Eventing.Reader.EventLogRecord
 .PARAMETER LogFilePath
 	The path/paths where saved evt files are stored.
-
 .PARAMETER DataProperty
 	Event.EventData.Data property value to search for.
-
-.PARAMETER SplunkHecUri
-	Splunk HTTP Event Collector endpoint to send events to.
-
-.PARAMETER SplunkHecApiKey
+.PARAMETER SplunkServer
+	FQDN of Splunk server.
+.PARAMETER Port
+	TCP port number for the HTTP connection.
+.PARAMETER ApiKey
 	API Key for authorization header.
-
-.PARAMETER TeeOutput
+.PARAMETER Protocol
+	HTTP or HTTPS
+.PARAMETER EndPoint
+	Relative API endpoint for the Splunk HTTP event collector.
+.PARAMETER SplunkHecUrl
+	Splunk HTTP Event Collector endpoint to send events to.
+.PARAMETER PassThru
 	Switch parameter to output events to the pipeline
-
-.PARAMETER SplunkHecRestHeaders
-	Actual Splunk HEC REST headers hashtable
-
+.PARAMETER Provider
+	Provider for the XML EventLog filter.
+.PARAMETER Headers
+	Splunk HEC REST headers hashtable.
 .PARAMETER Epoch
 	Reference to epoch (1 JAN 1970) for calculating Splunk 'time' field.
-
-.EXAMPLE
-	. .\Send-EvtLogsToSplunk.ps1 -LogFilePath '\\server2\path2' -DataProperty 'john.doe'
-
 .NOTES
     ###################################################################
     Author:     @oregon-national-guard/systems-administration
@@ -230,19 +251,16 @@ End {} #End
     or favoring by the United States Government and shall not be used
     for advertising or product endorsement purposes.
     ###################################################################
-
 .LINK
 	https://github.com/oregon-national-guard
-
 .LINK
 	https://creativecommons.org/publicdomain/zero/1.0/
-
+.LINK
+	http://dev.splunk.com/view/event-collector/SP-CAAAE6P#meta
 .LINK
 	https://github.com/RamblingCookieMonster/PowerShell/blob/master/Get-WinEventData.ps1
-
 .LINK
-	https://blogs.technet.microsoft.com/ashleymcglone/2013/08/28/powershell-get-winevent-xml-madness-getting-details-from-event-logs/
-
+	https://blogs.technet.microsoft.com/ashleymcglone/2013/08/28/
 .LINK
 	https://community.spiceworks.com/scripts/show/3239-select-winevent-make-custom-objects-from-get-winevent
 #>
