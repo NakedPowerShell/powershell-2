@@ -156,8 +156,6 @@ function Get-LastLoggedOnUser {
 
                 $UserName = $($LastLoggedOnUser.UserName)
 
-                Set-Clipboard -Value $UserName
-
                 $FirstName = $UserName.Split('.') | Select-Object -First 1
                 $RawLastName = $UserName.Split('.') | Select-Object -Last 1
                 $LastName = $RawLastName -replace '[0-9]+',''
