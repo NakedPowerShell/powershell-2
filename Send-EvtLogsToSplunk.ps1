@@ -1,49 +1,108 @@
-﻿#Requires -Version 3.0
+#Requires -Version 3.0
+
+<#
+.SYNOPSIS
+    Parses saved evt log files and exports them to Splunk.
+.DESCRIPTION
+    Parses saved evt log files using advanced XML query filters.
+    Extracts embedded EventData and appends it to the parent event.
+    Exports the events to Splunk via the HTTP event collector API.
+.EXAMPLE
+    . C:\Scripts\Send-EvtLogsToSplunk.ps1 -LogFilePath '\\server2\path2' -DataProperty 'john.doe'
+.INPUTS
+    System.String
+.OUTPUTS
+    None
+    System.Diagnostics.Eventing.Reader.EventLogRecord
+.PARAMETER LogFilePath
+    The path/paths where saved evt files are stored.
+.PARAMETER DataProperty
+    Event.EventData.Data property value to search for.
+.PARAMETER SplunkServer
+    FQDN of Splunk server.
+.PARAMETER Port
+    TCP port number for the HTTP connection.
+.PARAMETER ApiKey
+    API Key for authorization header.
+.PARAMETER Protocol
+    HTTP or HTTPS
+.PARAMETER EndPoint
+    Relative API endpoint for the Splunk HTTP event collector.
+.PARAMETER SplunkHecUrl
+    Splunk HTTP Event Collector endpoint to send events to.
+.PARAMETER PassThru
+    Switch parameter to output events to the pipeline
+.PARAMETER Provider
+    Provider for the XML EventLog filter.
+.PARAMETER Headers
+    Splunk HEC REST headers hashtable.
+.PARAMETER Epoch
+    Reference to epoch (1 JAN 1970) for calculating Splunk 'time' field.
+.NOTES
+    #######################################################################################
+    Author:     @oregon-national-guard/systems-administration
+    Version:    1.0
+    #######################################################################################
+    License:    https://github.com/oregon-national-guard/powershell/blob/master/LICENCE
+    #######################################################################################
+.LINK
+    https://github.com/oregon-national-guard
+.LINK
+    https://creativecommons.org/publicdomain/zero/1.0/
+.LINK
+    http://dev.splunk.com/view/event-collector/SP-CAAAE6P#meta
+.LINK
+    https://github.com/RamblingCookieMonster/PowerShell/blob/master/Get-WinEventData.ps1
+.LINK
+    https://blogs.technet.microsoft.com/ashleymcglone/2013/08/28/
+.LINK
+    https://community.spiceworks.com/scripts/show/3239-select-winevent-make-custom-objects-from-get-winevent
+#>
 
 [cmdletbinding()]
 
-Param (
+param (
 
-	[parameter(ValueFromPipeline=$True)]
-	[string[]] $LogFilePath = '\\server1\path1',
+    [parameter(ValueFromPipeline=$True)]
+    [string[]] $LogFilePath = '\\server1\path1',
 
-	[string] $DataProperty = $env:USERNAME,
+    [string] $DataProperty = $env:USERNAME,
 
-	[string] $SplunkServer = 'splunk.example.com',
+    [string] $SplunkServer = 'splunk.example.com',
 
-	[string] $Port = '8088',
+    [string] $Port = '8088',
 
-	[string] $ApiKey = 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
+    [string] $ApiKey = 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
 
-	[parameter()]
-	[ValidateSet('http', 'https')]
-	[string] $Protocol = 'http',
+    [parameter()]
+    [ValidateSet('http', 'https')]
+    [string] $Protocol = 'http',
 
-	[string] $EndPoint = '/services/collector',
+    [string] $EndPoint = '/services/collector',
 
-	[string] $SplunkHecUrl = "$($Protocol + '://' + $SplunkServer + ':' + $Port + $EndPoint)",
+    [string] $SplunkHecUrl = "$($Protocol + '://' + $SplunkServer + ':' + $Port + $EndPoint)",
 
-	[switch] $PassThru,
+    [switch] $PassThru,
 
-	[string] $Provider = 'Microsoft-Windows-Security-Auditing',
+    [string] $Provider = 'Microsoft-Windows-Security-Auditing',
 
-	[System.Collections.Hashtable] $Headers = @{ Authorization = "Splunk $ApiKey" },
+    [System.Collections.Hashtable] $Headers = @{ Authorization = "Splunk $ApiKey" },
 
-	[datetime] $Epoch = (Get-Date -Date '01/01/1970')
+    [datetime] $Epoch = (Get-Date -Date '01/01/1970')
 
-) #Param
+) #param
 
-Begin {} #Begin
+begin {} #begin
 
-Process {
+process {
 
-	$LogFiles = Get-ChildItem -Path $LogFilePath -Filter *.evt | Sort-Object -Property LastWriteTime -Descending
+    $LogFiles = Get-ChildItem -Path $LogFilePath -Filter *.evt | Sort-Object -Property LastWriteTime -Descending
 
-	$LogFiles | ForEach-Object {
+    $LogFiles | ForEach-Object {
 
-	# This filter will get events related to creating,
-	# changing, or deleting Active Directory objects.
-	$QueryString = @"
+        # This filter will get events related to creating,
+        # changing, or deleting Active Directory objects.
+        $QueryString = @"
 <QueryList>
   <Query Id='0' Path='file://$($_.FullName)'>
     <Select Path='file://$($_.FullName)'>
@@ -68,199 +127,103 @@ Process {
 </QueryList>
 "@
 
-	$QueryXml = [xml]$QueryString
+        $QueryXml = [xml]$QueryString
 
-	$ErrorActionPreferenceBak = $ErrorActionPreference
+        $ErrorActionPreferenceBak = $ErrorActionPreference
 
-	# Set ErrorActionPreference to Stop for the trycatch
-	$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+        # Set ErrorActionPreference to Stop for the trycatch
+        $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 
-	try {
+        try {
 
-		$Events = Get-WinEvent -FilterXml $QueryXml -Oldest
+            $Events = Get-WinEvent -FilterXml $QueryXml -Oldest
 
-	} catch {
+        } catch {
 
-		$Events = $false
+            $Events = $false
 
-	} #trycatch
+        } #trycatch
 
-	$ErrorActionPreference = $ErrorActionPreferenceBak
+        $ErrorActionPreference = $ErrorActionPreferenceBak
 
-	# If any events are returned, continiue.
-	if (!($Events -eq $false)) {
+        # If any events are returned, continiue.
+        if (!($Events -eq $false)) {
 
-		ForEach ($Event in $Events) {
+            ForEach ($Event in $Events) {
 
-			# Get a native XML version of each event
-			$EventXml = [xml]$Event.ToXml()
+                # Get a native XML version of each event
+                $EventXml = [xml]$Event.ToXml()
 
-			$XmlData = $null
+                $XmlData = $null
 
-			# Check to see if there's anything in the Event.EventData.Data nodes
-			if ($XmlData = @($EventXml.Event.EventData.Data)) {
+                # Check to see if there's anything in the Event.EventData.Data nodes
+                if ($XmlData = @($EventXml.Event.EventData.Data)) {
 
-				# Loop through the EventData fields.
-				# Use an integrated loop counter based on the total count of Data fields.
-				for ($i=0; $i -lt $XmlData.Count; $i++) {
+                    # Loop through the EventData fields.
+                    # Use an integrated loop counter based on the total count of Data fields.
+                    for ($i=0; $i -lt $XmlData.Count; $i++) {
 
-					# Append each one as a NoteProperty to the parent event.
-					$SplatArgs = @{	InputObject = $Event ;
-									MemberType = "NoteProperty" ;
-									Name = "$($XmlData[$i].name)" ;
-									Value = "$($XmlData[$i].'#text')" ;
-									Force = $true ;
-									Passthru = $true }
+                        # Append each one as a NoteProperty to the parent event.
+                        $SplatArgs = @{ InputObject = $Event ;
+                                        MemberType = "NoteProperty" ;
+                                        Name = "$($XmlData[$i].name)" ;
+                                        Value = "$($XmlData[$i].'#text')" ;
+                                        Force = $true ;
+                                        Passthru = $true }
 
-					$Event = Add-Member @SplatArgs
+                        $Event = Add-Member @SplatArgs
 
-				} #for
+                    } #for
 
-			} #if
+                } #if
 
-		} #ForEach (`$Event in `$Events)
+            } #ForEach (`$Event in `$Events)
 
-		$Events | ForEach-Object {
+            $Events | ForEach-Object {
 
-			$EachEvent = $_
+                $EachEvent = $_
 
-			# Convert the events to JSON for easy Splunk input.
-			$JsonEvent = $_ | ConvertTo-Json -Compress
+                # Convert the events to JSON for easy Splunk input.
+                $JsonEvent = $_ | ConvertTo-Json -Compress
 
-			# Account for the fact that epoch needs to be in UTC
-			[string] $EpochTime = $(
-										(
-											(
-												New-TimeSpan -Start $Epoch -End (
-													[system.timezoneinfo]::ConvertTime(
-														($_.TimeCreated),([system.timezoneinfo]::UTC)
-													)
-												)
-											).TotalSeconds
-										).ToString()
-									)
+                # Account for the fact that epoch needs to be in UTC
+                [string] $EpochTime = $(
+                    (
+                        (
+                            New-TimeSpan -Start $Epoch -End (
+                                [system.timezoneinfo]::ConvertTime(
+                                    ($_.TimeCreated),([system.timezoneinfo]::UTC)
+                                )
+                            )
+                        ).TotalSeconds
+                    ).ToString()
+                )
 
-			# Build the HTTP body. Be sure to follow proper JSON formatting.
-			# You could also add a sourcetype to the top level of the JSON object.
-			# See: 'http://dev.splunk.com/view/event-collector/SP-CAAAE6P#meta' for details.
-			$Body = "{`"time`": `"$EpochTime`",`"host`": `"$($_.MachineName)`",`"event`": $JsonEvent}"
+                # Build the HTTP body. Be sure to follow proper JSON formatting.
+                # You could also add a sourcetype to the top level of the JSON object.
+                # See: 'http://dev.splunk.com/view/event-collector/SP-CAAAE6P#meta' for details.
+                $Body = "{`"time`": `"$EpochTime`",`"host`": `"$($_.MachineName)`",`"event`": $JsonEvent}"
 
-			$SplatArgs = @{	Uri = $SplunkHecUrl ;
-							Headers = $Headers ;
-							Method = 'Post' ;
-							Body = $Body }
+                $SplatArgs = @{    Uri = $SplunkHecUrl ;
+                                Headers = $Headers ;
+                                Method = 'Post' ;
+                                Body = $Body }
 
-			# Send the event to Splunk HTTP event collector.
-			Invoke-RestMethod @SplatArgs | Out-Null
+                # Send the event to Splunk HTTP event collector.
+                Invoke-RestMethod @SplatArgs | Out-Null
 
-			if ($PassThru) {
+                if ($PassThru) {
 
-				$EachEvent
+                    $EachEvent
 
-			}
+                }
 
-		} #ForEach-Object (`$Events)
+            } #ForEach-Object (`$Events)
 
-	} #if
+        } #if
 
-	} #ForEach-Object (`$LogFiles)
+    } #ForEach-Object (`$LogFiles)
 
-} #Process
+} #process
 
-End {} #End
-
-<#
-.SYNOPSIS
-	Parses saved evt log files and exports them to Splunk.
-.DESCRIPTION
-	Parses saved evt log files using advanced XML query filters.
-	Extracts embedded EventData and appends it to the parent event.
-	Exports the events to Splunk via the HTTP event collector API.
-.EXAMPLE
-	. C:\Scripts\Send-EvtLogsToSplunk.ps1 -LogFilePath '\\server2\path2' -DataProperty 'john.doe'
-.INPUTS
-	System.String
-.OUTPUTS
-	None
-	System.Diagnostics.Eventing.Reader.EventLogRecord
-.PARAMETER LogFilePath
-	The path/paths where saved evt files are stored.
-.PARAMETER DataProperty
-	Event.EventData.Data property value to search for.
-.PARAMETER SplunkServer
-	FQDN of Splunk server.
-.PARAMETER Port
-	TCP port number for the HTTP connection.
-.PARAMETER ApiKey
-	API Key for authorization header.
-.PARAMETER Protocol
-	HTTP or HTTPS
-.PARAMETER EndPoint
-	Relative API endpoint for the Splunk HTTP event collector.
-.PARAMETER SplunkHecUrl
-	Splunk HTTP Event Collector endpoint to send events to.
-.PARAMETER PassThru
-	Switch parameter to output events to the pipeline
-.PARAMETER Provider
-	Provider for the XML EventLog filter.
-.PARAMETER Headers
-	Splunk HEC REST headers hashtable.
-.PARAMETER Epoch
-	Reference to epoch (1 JAN 1970) for calculating Splunk 'time' field.
-.NOTES
-    ###################################################################
-    Author:     @oregon-national-guard/systems-administration
-    Version:    1.0
-    ###################################################################
-    License
-    -------
-    This Work was prepared by a United States Government employee and,
-    therefore, is excluded from copyright by Section 105 of the Copyright
-    Act of 1976. Copyright and Related Rights in the Work worldwide are
-    waived through the CC0 1.0 Universal license. Portions of specific
-    scripts are licensed under Microsoft Limited Public License.
-    ###################################################################
-    Disclaimer of Warranty
-    ----------------------
-    This Work is provided "as is." Any express or implied warranties,
-    including but not limited to, the implied warranties of merchantability
-    and fitness for a particular purpose are disclaimed. In no event shall
-    the United States Government be liable for any direct, indirect,
-    incidental, special, exemplary or consequential damages (including,
-    but not limited to, procurement of substitute goods or services,
-    loss of use, data or profits, or business interruption) however caused
-    and on any theory of liability, whether in contract, strict liability,
-    or tort (including negligence or otherwise) arising in any way out of
-    the use of this Guidance, even if advised of the possibility of such damage.
-    The User of this Work agrees to hold harmless and indemnify the
-    United States Government, its agents and employees from every claim or
-    liability (whether in tort or in contract), including attorneys' fees,
-    court costs, and expenses, arising in direct consequence of Recipient's
-    use of the item, including, but not limited to, claims or liabilities
-    made for injury to or death of personnel of User or third parties, damage
-    to or destruction of property of User or third parties, and infringement or
-    other violations of intellectual property or technical data rights.
-    Nothing in this Work is intended to constitute an endorsement, explicit or implied,
-    by the United States Government of any particular manufacturer's product or service.
-    ###################################################################
-    Disclaimer of Endorsement
-    -------------------------
-    Reference herein to any specific commercial product, process,
-    or service by trade name, trademark, manufacturer, or otherwise,
-    in this Work does not constitute an endorsement, recommendation,
-    or favoring by the United States Government and shall not be used
-    for advertising or product endorsement purposes.
-    ###################################################################
-.LINK
-	https://github.com/oregon-national-guard
-.LINK
-	https://creativecommons.org/publicdomain/zero/1.0/
-.LINK
-	http://dev.splunk.com/view/event-collector/SP-CAAAE6P#meta
-.LINK
-	https://github.com/RamblingCookieMonster/PowerShell/blob/master/Get-WinEventData.ps1
-.LINK
-	https://blogs.technet.microsoft.com/ashleymcglone/2013/08/28/
-.LINK
-	https://community.spiceworks.com/scripts/show/3239-select-winevent-make-custom-objects-from-get-winevent
-#>
+end {} #end
