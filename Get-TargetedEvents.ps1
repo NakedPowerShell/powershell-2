@@ -1,133 +1,59 @@
-Function Get-TargetedEvents  {
+function Get-TargetedEvents  {
 
-[cmdletbinding()]
+    <#
+    .SYNOPSIS
+        Parses Windows logs for events related to a specific username or other metadata value
+    .DESCRIPTION
+        Parses Windows logs for events related to a specific username or other metadata value
+    .PARAMETER ComputerName
+        The computer name/names to operate on. Defaults to `$env:COMPUTERNAME
+    .PARAMETER SearchTerm
+        The term to search for
+    .EXAMPLE
+        Get-TargetedEvents -SearchTerm user.name
+        Gets local events for user.name
+    .EXAMPLE
+        'host1','host2' | Get-TargetedEvents -SearchTerm user.name
+        Gets events from both hosts input via the pipeline for user.name
+    .NOTES
+        #######################################################################################
+        Author:     @oregon-national-guard/systems-administration
+        Version:    1.0
+        #######################################################################################
+        License:    https://github.com/oregon-national-guard/powershell/blob/master/LICENCE
+        #######################################################################################
+    .LINK
+        https://github.com/oregon-national-guard
+    .LINK
+        https://creativecommons.org/publicdomain/zero/1.0/
+    #>
 
-Param (
+    [cmdletbinding()]
 
-	[parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
-	[Alias('DNSHostName','PSComputerName','CN','Hostname')]
-	[string[]] $ComputerName = @($env:COMPUTERNAME),
+    param (
 
-	[string] $SearchTerm = $env:USERNAME
+        [parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [Alias('PSComputerName','DNSHostName','CN','Hostname')]
+        [string[]] $ComputerName = @($env:COMPUTERNAME),
 
-) # Param
+        [string] $SearchTerm = $env:USERNAME
 
-Begin {} # Begin
+    ) #param
 
-Process  {
+    begin {} #begin
 
-	$QueryFilterXpath = "*[EventData[Data and (Data='$SearchTerm')]]"
+    process  {
 
-	$ComputerName | ForEach-Object {
+        $QueryFilterXpath = "*[EventData[Data and (Data='$SearchTerm')]]"
 
-		Get-WinEvent -LogName Security -ComputerName $_ -FilterXPath $QueryFilterXpath -ErrorAction SilentlyContinue
+        $ComputerName | ForEach-Object {
 
-	}
+            Get-WinEvent -LogName Security -ComputerName $_ -FilterXPath $QueryFilterXpath -ErrorAction SilentlyContinue
 
-} # Process
+        }
 
-End {} # End
+    } #process
 
-<#
+    end {} #end
 
-	.SYNOPSIS
-
-		Parses Windows logs for events related to a specific username or other metadata value
-
-
-	.DESCRIPTION
-
-		Parses Windows logs for events related to a specific username or other metadata value
-
-
-	.PARAMETER ComputerName
-
-		The computer name/names to operate on. Defaults to `$env:COMPUTERNAME
-
-
-	.PARAMETER SearchTerm
-
-		The term to search for
-
-
-	.EXAMPLE
-
-		Get-TargetedEvents -SearchTerm user.name
-		Gets local events for user.name
-
-
-	.EXAMPLE
-
-		'host1','host2' | Get-TargetedEvents -SearchTerm user.name
-		Gets events from both hosts input via the pipeline for user.name
-
-
-	.NOTES
-
-		###################################################################
-
-		Author:     @oregon-national-guard/systems-administration
-		Version:    1.0
-
-		###################################################################
-
-		License
-		-------
-		This Work was prepared by a United States Government employee and,
-		therefore, is excluded from copyright by Section 105 of the Copyright
-		Act of 1976. Copyright and Related Rights in the Work worldwide are
-		waived through the CC0 1.0 Universal license. Portions of specific
-		scripts are licensed under Microsoft Limited Public License.
-
-		###################################################################
-
-		Disclaimer of Warranty
-		----------------------
-		This Work is provided "as is." Any express or implied warranties,
-		including but not limited to, the implied warranties of merchantability
-		and fitness for a particular purpose are disclaimed. In no event shall
-		the United States Government be liable for any direct, indirect,
-		incidental, special, exemplary or consequential damages (including,
-		but not limited to, procurement of substitute goods or services,
-		loss of use, data or profits, or business interruption) however caused
-		and on any theory of liability, whether in contract, strict liability,
-		or tort (including negligence or otherwise) arising in any way out of
-		the use of this Guidance, even if advised of the possibility of such damage.
-
-		The User of this Work agrees to hold harmless and indemnify the
-		United States Government, its agents and employees from every claim or
-		liability (whether in tort or in contract), including attorneys' fees,
-		court costs, and expenses, arising in direct consequence of Recipient's
-		use of the item, including, but not limited to, claims or liabilities
-		made for injury to or death of personnel of User or third parties, damage
-		to or destruction of property of User or third parties, and infringement or
-		other violations of intellectual property or technical data rights.
-
-		Nothing in this Work is intended to constitute an endorsement, explicit or implied,
-		by the United States Government of any particular manufacturer's product or service.
-
-		###################################################################
-
-		Disclaimer of Endorsement
-		-------------------------
-		Reference herein to any specific commercial product, process,
-		or service by trade name, trademark, manufacturer, or otherwise,
-		in this Work does not constitute an endorsement, recommendation,
-		or favoring by the United States Government and shall not be used
-		for advertising or product endorsement purposes.
-
-		###################################################################
-
-
-	.LINK
-
-		https://github.com/oregon-national-guard
-
-
-	.LINK
-
-		https://creativecommons.org/publicdomain/zero/1.0/
-
-#>
-
-} # Get-TargetedEvents
+} #function Get-TargetedEvents
